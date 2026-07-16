@@ -1,0 +1,13 @@
+[project]
+name = "cloudpilot-finops-agent"
+version = "0.1.0"
+description = "Human-in-the-loop AI remediation backend for AWS cost optimization."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Aayush Pandey" }]
+keywords = ["aws", "finops", "terraform", "fastapi", "platform-engineering", "ai"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

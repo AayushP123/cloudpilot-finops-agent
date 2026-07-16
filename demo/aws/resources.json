@@ -1,0 +1,122 @@
+[
+  {
+    "id": "i-0demoapi123",
+    "account_id": "demo-aws",
+    "type": "ec2",
+    "name": "dev-api-worker",
+    "region": "us-east-1",
+    "terraform_address": "aws_instance.dev_api_worker",
+    "monthly_cost": 280.0,
+    "tags": {
+      "env": "dev",
+      "owner": "platform",
+      "service": "api"
+    },
+    "metrics": {
+      "avg_cpu_14d_pct": 3.2,
+      "peak_cpu_14d_pct": 22.4,
+      "avg_network_mbps": 2.1,
+      "p95_latency_ms": 91,
+      "error_rate_pct": 0.04
+    },
+    "config": {
+      "instance_type": "m5.2xlarge"
+    }
+  },
+  {
+    "id": "db-demo-analytics",
+    "account_id": "demo-aws",
+    "type": "rds",
+    "name": "analytics-postgres",
+    "region": "us-east-1",
+    "terraform_address": "aws_db_instance.analytics",
+    "monthly_cost": 640.0,
+    "tags": {
+      "env": "staging",
+      "owner": "data",
+      "service": "analytics"
+    },
+    "metrics": {
+      "avg_cpu_14d_pct": 6.5,
+      "peak_cpu_14d_pct": 38.1,
+      "avg_connections": 11,
+      "p95_latency_ms": 122,
+      "error_rate_pct": 0.02
+    },
+    "config": {
+      "instance_class": "db.m6g.2xlarge"
+    }
+  },
+  {
+    "id": "lb-old-marketing",
+    "account_id": "demo-aws",
+    "type": "load_balancer",
+    "name": "old-marketing-lb",
+    "region": "us-east-1",
+    "terraform_address": "aws_lb.old_marketing",
+    "monthly_cost": 22.4,
+    "tags": {
+      "env": "prod",
+      "owner": "growth",
+      "service": "legacy-marketing"
+    },
+    "metrics": {
+      "requests_14d": 0,
+      "healthy_hosts": 0,
+      "p95_latency_ms": 0,
+      "error_rate_pct": 0
+    },
+    "config": {
+      "internal": false
+    }
+  },
+  {
+    "id": "vol-0unusedsnapshot",
+    "account_id": "demo-aws",
+    "type": "ebs_volume",
+    "name": "unused-build-cache",
+    "region": "us-east-1",
+    "terraform_address": "aws_ebs_volume.unused_build_cache",
+    "monthly_cost": 64.0,
+    "tags": {
+      "env": "dev",
+      "owner": "build",
+      "service": "ci"
+    },
+    "metrics": {
+      "attached": false,
+      "age_days": 47,
+      "p95_latency_ms": 0,
+      "error_rate_pct": 0
+    },
+    "config": {
+      "size_gb": 800,
+      "type": "gp3"
+    }
+  },
+  {
+    "id": "i-prod-busy",
+    "account_id": "demo-aws",
+    "type": "ec2",
+    "name": "prod-checkout-api",
+    "region": "us-east-1",
+    "terraform_address": "aws_instance.prod_checkout_api",
+    "monthly_cost": 140.0,
+    "tags": {
+      "env": "prod",
+      "owner": "payments",
+      "service": "checkout"
+    },
+    "metrics": {
+      "avg_cpu_14d_pct": 51.0,
+      "peak_cpu_14d_pct": 88.0,
+      "avg_network_mbps": 38.5,
+      "p95_latency_ms": 240,
+      "error_rate_pct": 0.21
+    },
+    "config": {
+      "instance_type": "m5.xlarge"
+    }
+  }
+]
+
