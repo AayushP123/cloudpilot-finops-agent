@@ -1,0 +1,845 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Interactive CloudPilot FinOps Agent demo: detect AWS waste, review policy-gated recommendations, and generate Terraform remediation PRs.">
+  <title>CloudPilot — AI FinOps Remediation Agent</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #eef4ff;
+      --muted: #91a0b8;
+      --line: rgba(155, 177, 214, 0.15);
+      --panel: rgba(13, 22, 38, 0.86);
+      --panel-2: rgba(17, 29, 49, 0.78);
+      --cyan: #55e4ff;
+      --blue: #7aa2ff;
+      --green: #44e3a1;
+      --amber: #ffca72;
+      --red: #ff7b91;
+      --shadow: 0 24px 70px rgba(0, 0, 0, 0.34);
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 12% -10%, rgba(74, 117, 255, 0.28), transparent 33rem),
+        radial-gradient(circle at 88% 3%, rgba(0, 224, 186, 0.18), transparent 29rem),
+        linear-gradient(145deg, #06101e 0%, #081421 50%, #07101b 100%);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.26;
+      background-image:
+        linear-gradient(rgba(255,255,255,.026) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.026) 1px, transparent 1px);
+      background-size: 44px 44px;
+      mask-image: linear-gradient(to bottom, black, transparent 76%);
+    }
+
+    a { color: inherit; text-decoration: none; }
+
+    button {
+      font: inherit;
+    }
+
+    .shell {
+      width: min(1240px, calc(100% - 40px));
+      margin: 0 auto;
+      padding-bottom: 64px;
+    }
+
+    nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 78px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 760;
+      letter-spacing: -0.02em;
+    }
+
+    .brand-mark {
+      display: grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      border: 1px solid rgba(85, 228, 255, 0.34);
+      border-radius: 10px;
+      background: linear-gradient(145deg, rgba(85,228,255,.18), rgba(122,162,255,.1));
+      box-shadow: inset 0 0 16px rgba(85,228,255,.09);
+    }
+
+    .brand-mark svg { width: 20px; height: 20px; }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .demo-pill,
+    .status-pill,
+    .risk,
+    .policy {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+
+    .demo-pill {
+      padding: 8px 12px;
+      color: #b7c6db;
+      background: rgba(255,255,255,.035);
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 12px rgba(68,227,161,.8);
+    }
+
+    .source-link,
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 40px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 0 14px;
+      color: #dce7f8;
+      background: rgba(255,255,255,.04);
+      cursor: pointer;
+      transition: border-color .18s ease, transform .18s ease, background .18s ease;
+    }
+
+    .source-link:hover,
+    .button:hover {
+      transform: translateY(-1px);
+      border-color: rgba(122,162,255,.45);
+      background: rgba(122,162,255,.10);
+    }
+
+    .button.primary {
+      border-color: rgba(85,228,255,.46);
+      color: #06131d;
+      font-weight: 760;
+      background: linear-gradient(135deg, var(--cyan), #83ffc5);
+      box-shadow: 0 10px 28px rgba(85,228,255,.16);
+    }
+
+    .button.primary:hover { background: linear-gradient(135deg, #7cecff, #9bffd3); }
+    .button:disabled { cursor: wait; opacity: .68; transform: none; }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.3fr) minmax(350px, .7fr);
+      gap: 44px;
+      align-items: end;
+      padding: 70px 0 44px;
+    }
+
+    .eyebrow {
+      color: var(--cyan);
+      font: 700 12px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+      letter-spacing: .13em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      max-width: 780px;
+      margin: 17px 0 18px;
+      font-size: clamp(44px, 6vw, 78px);
+      line-height: .98;
+      letter-spacing: -.055em;
+    }
+
+    .gradient-text {
+      color: transparent;
+      background: linear-gradient(100deg, #f6fbff 5%, var(--cyan) 48%, #9cf8c5 90%);
+      -webkit-background-clip: text;
+      background-clip: text;
+    }
+
+    .lead {
+      max-width: 720px;
+      margin: 0;
+      color: #aab8cd;
+      font-size: 18px;
+      line-height: 1.65;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 11px;
+      margin-top: 28px;
+    }
+
+    .console {
+      overflow: hidden;
+      border: 1px solid rgba(122,162,255,.2);
+      border-radius: 16px;
+      background: rgba(4, 10, 19, .74);
+      box-shadow: var(--shadow);
+    }
+
+    .console-head {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      height: 42px;
+      padding: 0 15px;
+      border-bottom: 1px solid var(--line);
+      color: #66758d;
+      font: 600 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+      text-transform: uppercase;
+      letter-spacing: .09em;
+    }
+
+    .console-head i {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #ff6e7f;
+    }
+    .console-head i:nth-child(2) { background: #ffd06b; }
+    .console-head i:nth-child(3) { background: #45e3a0; margin-right: 5px; }
+
+    .console-body {
+      min-height: 228px;
+      padding: 18px;
+      color: #9eb0c8;
+      font: 12px/1.75 ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+
+    .console-line { animation: appear .25s ease both; }
+    .console-line .prompt { color: var(--cyan); }
+    .console-line .good { color: var(--green); }
+    .console-line .warn { color: var(--amber); }
+
+    @keyframes appear {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+      margin-bottom: 22px;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: linear-gradient(150deg, rgba(18,31,51,.88), rgba(10,18,31,.72));
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.026);
+    }
+
+    .metric { padding: 20px; }
+
+    .metric-label {
+      color: #8190a8;
+      font-size: 12px;
+      font-weight: 680;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+
+    .metric-value {
+      margin: 10px 0 7px;
+      font-size: clamp(25px, 3vw, 35px);
+      font-weight: 760;
+      letter-spacing: -.04em;
+    }
+
+    .metric-note {
+      color: #708098;
+      font-size: 12px;
+    }
+
+    .metric:first-child .metric-value { color: var(--green); }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(0, 1.7fr) minmax(300px, .75fr);
+      gap: 18px;
+    }
+
+    .panel-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 21px 22px 17px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .panel-head h2,
+    .activity h2 {
+      margin: 0 0 6px;
+      font-size: 17px;
+      letter-spacing: -.02em;
+    }
+
+    .panel-head p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .status-pill {
+      padding: 7px 10px;
+      color: var(--green);
+      border-color: rgba(68,227,161,.2);
+      background: rgba(68,227,161,.06);
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .recommendations {
+      display: grid;
+      gap: 0;
+    }
+
+    .recommendation {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 20px;
+      padding: 20px 22px;
+      border-bottom: 1px solid var(--line);
+      transition: background .18s ease;
+    }
+
+    .recommendation:last-child { border-bottom: 0; }
+    .recommendation:hover { background: rgba(122,162,255,.035); }
+
+    .rec-top {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .rec-title {
+      margin: 0 0 6px;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+
+    .rec-id {
+      color: #5e6e87;
+      font: 10px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+
+    .rec-description {
+      max-width: 690px;
+      margin: 0;
+      color: #8292aa;
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .risk,
+    .policy {
+      padding: 4px 8px;
+      font-size: 10px;
+      font-weight: 750;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+
+    .risk.low { color: var(--green); border-color: rgba(68,227,161,.2); }
+    .risk.medium { color: var(--amber); border-color: rgba(255,202,114,.2); }
+    .policy.auto { color: var(--blue); border-color: rgba(122,162,255,.23); }
+    .policy.review { color: var(--amber); border-color: rgba(255,202,114,.22); }
+
+    .rec-side {
+      min-width: 158px;
+      text-align: right;
+    }
+
+    .saving {
+      color: var(--green);
+      font-size: 17px;
+      font-weight: 760;
+    }
+
+    .saving span {
+      color: #6d7c92;
+      font-size: 10px;
+      font-weight: 600;
+    }
+
+    .rec-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 7px;
+      margin-top: 12px;
+    }
+
+    .mini-button {
+      min-height: 30px;
+      padding: 0 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: #aebbd0;
+      background: rgba(255,255,255,.025);
+      font-size: 10px;
+      font-weight: 720;
+      cursor: pointer;
+    }
+
+    .mini-button:hover { border-color: rgba(85,228,255,.35); color: var(--cyan); }
+    .mini-button.done { color: var(--green); border-color: rgba(68,227,161,.25); }
+
+    .side-stack {
+      display: grid;
+      align-content: start;
+      gap: 18px;
+    }
+
+    .activity { padding: 21px; }
+
+    .activity-list {
+      display: grid;
+      gap: 16px;
+      margin-top: 19px;
+    }
+
+    .activity-item {
+      position: relative;
+      padding-left: 19px;
+      color: #8695ac;
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
+    .activity-item::before {
+      content: "";
+      position: absolute;
+      top: 5px;
+      left: 0;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--blue);
+      box-shadow: 0 0 10px rgba(122,162,255,.5);
+    }
+
+    .activity-item strong {
+      display: block;
+      margin-bottom: 2px;
+      color: #cdd8e8;
+      font-size: 11px;
+    }
+
+    .pipeline { padding: 21px; }
+
+    .pipeline h3 {
+      margin: 0 0 16px;
+      font-size: 14px;
+    }
+
+    .pipeline-step {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      padding: 10px 0;
+      color: #8796ad;
+      font-size: 11px;
+      border-bottom: 1px solid rgba(155,177,214,.09);
+    }
+
+    .pipeline-step:last-child { border-bottom: 0; }
+
+    .pipeline-step b {
+      display: grid;
+      place-items: center;
+      width: 25px;
+      height: 25px;
+      border-radius: 8px;
+      color: var(--cyan);
+      background: rgba(85,228,255,.07);
+      font: 700 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+
+    .notice {
+      margin-top: 18px;
+      padding: 14px 16px;
+      border: 1px solid rgba(255,202,114,.14);
+      border-radius: 12px;
+      color: #968b78;
+      background: rgba(255,202,114,.035);
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
+    .notice strong { color: var(--amber); }
+
+    footer {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      margin-top: 30px;
+      padding: 22px 2px 0;
+      border-top: 1px solid var(--line);
+      color: #64738a;
+      font-size: 11px;
+    }
+
+    .hidden { display: none !important; }
+
+    @media (max-width: 940px) {
+      .hero,
+      .workspace { grid-template-columns: 1fr; }
+      .hero { align-items: start; }
+      .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 640px) {
+      .shell { width: min(100% - 24px, 1240px); }
+      nav { min-height: 68px; }
+      .demo-pill { display: none; }
+      .source-link { padding: 0 11px; font-size: 12px; }
+      .hero { padding-top: 48px; gap: 28px; }
+      h1 { font-size: 45px; }
+      .lead { font-size: 15px; }
+      .metrics { gap: 10px; }
+      .metric { padding: 16px; }
+      .recommendation { grid-template-columns: 1fr; }
+      .rec-side { text-align: left; }
+      .rec-actions { justify-content: flex-start; }
+      footer { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <nav aria-label="Primary navigation">
+      <a class="brand" href="#" aria-label="CloudPilot home">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M5 15.5a4 4 0 0 1 .4-7.98A6.5 6.5 0 0 1 18 9.5h.5a3.5 3.5 0 0 1 0 7H7.5" stroke="#55e4ff" stroke-width="1.7" stroke-linecap="round"/>
+            <path d="m9 13 3-3 3 3m-3-3v9" stroke="#8bffc8" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </span>
+        CloudPilot
+      </a>
+      <div class="nav-actions">
+        <span class="demo-pill"><span class="dot"></span> Synthetic demo mode</span>
+        <a class="source-link" href="https://github.com/AayushP123/cloudpilot-finops-agent" target="_blank" rel="noreferrer">
+          View source ↗
+        </a>
+      </div>
+    </nav>
+
+    <section class="hero">
+      <div>
+        <div class="eyebrow">AI FinOps Remediation Agent</div>
+        <h1>Turn cloud waste into <span class="gradient-text">reviewable fixes.</span></h1>
+        <p class="lead">
+          CloudPilot scans AWS inventory, detects cost anomalies, applies guardrails,
+          and generates Terraform remediation PRs with a human in the loop.
+        </p>
+        <div class="hero-actions">
+          <button class="button primary" id="scanButton" type="button">Run autonomous scan</button>
+          <button class="button" id="resetButton" type="button">Reset demo</button>
+        </div>
+      </div>
+
+      <section class="console" aria-label="Agent execution log">
+        <div class="console-head"><i></i><i></i><i></i> cloudpilot / autopilot</div>
+        <div class="console-body" id="consoleBody">
+          <div class="console-line"><span class="prompt">$</span> cloudpilot doctor</div>
+          <div class="console-line"><span class="good">✓</span> policy engine ready</div>
+          <div class="console-line"><span class="good">✓</span> terraform renderer ready</div>
+          <div class="console-line"><span class="good">✓</span> audit log ready</div>
+          <div class="console-line"><span class="warn">→</span> waiting for scan</div>
+        </div>
+      </section>
+    </section>
+
+    <section class="metrics" aria-label="Cloud savings metrics">
+      <article class="card metric">
+        <div class="metric-label">Potential savings</div>
+        <div class="metric-value" id="monthlySavings">$712.40</div>
+        <div class="metric-note">per month</div>
+      </article>
+      <article class="card metric">
+        <div class="metric-label">Annualized impact</div>
+        <div class="metric-value" id="annualSavings">$8,548.80</div>
+        <div class="metric-note">projected run-rate</div>
+      </article>
+      <article class="card metric">
+        <div class="metric-label">Resources scanned</div>
+        <div class="metric-value" id="resourceCount">5</div>
+        <div class="metric-note">across 3 AWS services</div>
+      </article>
+      <article class="card metric">
+        <div class="metric-label">Recommendations</div>
+        <div class="metric-value" id="recommendationCount">4</div>
+        <div class="metric-note"><span id="approvedCount">0</span> approved · <span id="prCount">0</span> PRs ready</div>
+      </article>
+    </section>
+
+    <section class="workspace">
+      <article class="card">
+        <header class="panel-head">
+          <div>
+            <h2>Remediation queue</h2>
+            <p>Policy-ranked recommendations generated from synthetic AWS inventory.</p>
+          </div>
+          <span class="status-pill"><span class="dot"></span> Scan complete</span>
+        </header>
+
+        <div class="recommendations" id="recommendations">
+          <section class="recommendation" data-id="rec-001" data-saving="312.40">
+            <div>
+              <div class="rec-top">
+                <span class="rec-id">REC-001</span>
+                <span class="risk low">Low risk</span>
+                <span class="policy auto">Auto-approved</span>
+              </div>
+              <h3 class="rec-title">Rightsize underutilized EC2 instance</h3>
+              <p class="rec-description">Average CPU remained below 8% for 30 days. Replace m5.2xlarge with m5.large and preserve tags, security groups, and attached storage.</p>
+            </div>
+            <div class="rec-side">
+              <div class="saving">$312.40 <span>/ month</span></div>
+              <div class="rec-actions">
+                <button class="mini-button approve" type="button">Approve</button>
+                <button class="mini-button pr" type="button">Open PR</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="recommendation" data-id="rec-002" data-saving="186.00">
+            <div>
+              <div class="rec-top">
+                <span class="rec-id">REC-002</span>
+                <span class="risk low">Low risk</span>
+                <span class="policy auto">Auto-approved</span>
+              </div>
+              <h3 class="rec-title">Schedule non-production RDS downtime</h3>
+              <p class="rec-description">Development database is idle overnight and on weekends. Add an automated 7 PM–7 AM schedule with a production-tag exclusion guardrail.</p>
+            </div>
+            <div class="rec-side">
+              <div class="saving">$186.00 <span>/ month</span></div>
+              <div class="rec-actions">
+                <button class="mini-button approve" type="button">Approve</button>
+                <button class="mini-button pr" type="button">Open PR</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="recommendation" data-id="rec-003" data-saving="124.00">
+            <div>
+              <div class="rec-top">
+                <span class="rec-id">REC-003</span>
+                <span class="risk medium">Medium risk</span>
+                <span class="policy review">Human review</span>
+              </div>
+              <h3 class="rec-title">Delete unattached EBS volumes after snapshot</h3>
+              <p class="rec-description">Two volumes have been unattached for 45+ days. The plan creates encrypted snapshots first and requires explicit approval before deletion.</p>
+            </div>
+            <div class="rec-side">
+              <div class="saving">$124.00 <span>/ month</span></div>
+              <div class="rec-actions">
+                <button class="mini-button approve" type="button">Approve</button>
+                <button class="mini-button pr" type="button">Open PR</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="recommendation" data-id="rec-004" data-saving="90.00">
+            <div>
+              <div class="rec-top">
+                <span class="rec-id">REC-004</span>
+                <span class="risk low">Low risk</span>
+                <span class="policy auto">Auto-approved</span>
+              </div>
+              <h3 class="rec-title">Move stale S3 objects to Intelligent-Tiering</h3>
+              <p class="rec-description">Objects in the logs prefix have not been accessed for 90 days. Add a lifecycle rule while retaining compliance and object-lock settings.</p>
+            </div>
+            <div class="rec-side">
+              <div class="saving">$90.00 <span>/ month</span></div>
+              <div class="rec-actions">
+                <button class="mini-button approve" type="button">Approve</button>
+                <button class="mini-button pr" type="button">Open PR</button>
+              </div>
+            </div>
+          </section>
+        </div>
+      </article>
+
+      <aside class="side-stack">
+        <section class="card activity">
+          <h2>Agent activity</h2>
+          <div class="activity-list" id="activityList">
+            <div class="activity-item"><strong>Inventory normalized</strong>5 resources loaded from demo/aws/resources.json</div>
+            <div class="activity-item"><strong>Guardrails evaluated</strong>1 recommendation routed to human review</div>
+            <div class="activity-item"><strong>Audit trail created</strong>Every decision is recorded with actor and reason</div>
+          </div>
+        </section>
+
+        <section class="card pipeline">
+          <h3>Remediation pipeline</h3>
+          <div class="pipeline-step"><b>01</b> AWS inventory ingestion</div>
+          <div class="pipeline-step"><b>02</b> Deterministic waste detectors</div>
+          <div class="pipeline-step"><b>03</b> Policy and risk evaluation</div>
+          <div class="pipeline-step"><b>04</b> Terraform patch generation</div>
+          <div class="pipeline-step"><b>05</b> Human approval and audit</div>
+          <div class="notice"><strong>Portfolio-safe demo.</strong> This page uses synthetic resources and simulates the UI workflow. The repository includes the tested FastAPI backend, SQLite audit log, AWS integration path, and GitHub PR adapter.</div>
+        </section>
+      </aside>
+    </section>
+
+    <footer>
+      <span>Built by Aayush Pandey · Python · FastAPI · AWS · Terraform</span>
+      <span>Human-in-the-loop by design · No cloud credentials used in this demo</span>
+    </footer>
+  </main>
+
+  <script>
+    const scanButton = document.querySelector("#scanButton");
+    const resetButton = document.querySelector("#resetButton");
+    const consoleBody = document.querySelector("#consoleBody");
+    const activityList = document.querySelector("#activityList");
+    const approvedCount = document.querySelector("#approvedCount");
+    const prCount = document.querySelector("#prCount");
+
+    let approved = new Set();
+    let prs = new Set();
+
+    const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+    function updateCounts() {
+      approvedCount.textContent = approved.size;
+      prCount.textContent = prs.size;
+    }
+
+    function addActivity(title, detail) {
+      const item = document.createElement("div");
+      item.className = "activity-item";
+      item.innerHTML = `<strong>${title}</strong>${detail}`;
+      activityList.prepend(item);
+      while (activityList.children.length > 5) activityList.lastElementChild.remove();
+    }
+
+    function addConsole(text, tone = "") {
+      const line = document.createElement("div");
+      line.className = "console-line";
+      const icon = tone === "good" ? "✓" : tone === "warn" ? "→" : "$";
+      line.innerHTML = `<span class="${tone || "prompt"}">${icon}</span> ${text}`;
+      consoleBody.appendChild(line);
+      consoleBody.scrollTop = consoleBody.scrollHeight;
+    }
+
+    async function runScan() {
+      scanButton.disabled = true;
+      scanButton.textContent = "Scanning AWS inventory…";
+      consoleBody.innerHTML = "";
+      addConsole("cloudpilot autopilot --open-prs=false");
+      await wait(420);
+      addConsole("loaded 5 synthetic resources", "good");
+      await wait(480);
+      addConsole("ran 4 deterministic waste detectors", "good");
+      await wait(440);
+      addConsole("policy gate: 3 auto-approved · 1 human review", "warn");
+      await wait(430);
+      addConsole("projected savings: $712.40/month", "good");
+      addActivity("Autonomous scan completed", "4 recommendations · $8,548.80 annualized impact");
+      scanButton.textContent = "Scan complete ✓";
+      await wait(900);
+      scanButton.disabled = false;
+      scanButton.textContent = "Run autonomous scan";
+    }
+
+    document.querySelectorAll(".approve").forEach(button => {
+      button.addEventListener("click", () => {
+        const row = button.closest(".recommendation");
+        const id = row.dataset.id;
+        if (approved.has(id)) return;
+        approved.add(id);
+        button.textContent = "Approved ✓";
+        button.classList.add("done");
+        addConsole(`${id} approved by demo.user`, "good");
+        addActivity("Recommendation approved", `${id.toUpperCase()} passed the human-in-the-loop gate`);
+        updateCounts();
+      });
+    });
+
+    document.querySelectorAll(".pr").forEach(button => {
+      button.addEventListener("click", async () => {
+        const row = button.closest(".recommendation");
+        const id = row.dataset.id;
+        if (prs.has(id)) return;
+        button.disabled = true;
+        button.textContent = "Rendering…";
+        await wait(520);
+        prs.add(id);
+        button.disabled = false;
+        button.textContent = "PR ready ✓";
+        button.classList.add("done");
+        addConsole(`${id} terraform plan rendered to artifacts/prs/`, "good");
+        addActivity("Terraform PR artifact ready", `${id.toUpperCase()} includes rationale, risk, diff, and rollback plan`);
+        updateCounts();
+      });
+    });
+
+    resetButton.addEventListener("click", () => {
+      approved = new Set();
+      prs = new Set();
+      document.querySelectorAll(".approve").forEach(button => {
+        button.textContent = "Approve";
+        button.classList.remove("done");
+      });
+      document.querySelectorAll(".pr").forEach(button => {
+        button.textContent = "Open PR";
+        button.classList.remove("done");
+        button.disabled = false;
+      });
+      consoleBody.innerHTML = `
+        <div class="console-line"><span class="prompt">$</span> cloudpilot demo reset</div>
+        <div class="console-line"><span class="good">✓</span> synthetic inventory restored</div>
+        <div class="console-line"><span class="warn">→</span> waiting for scan</div>
+      `;
+      addActivity("Demo state reset", "Synthetic inventory and approval state restored");
+      updateCounts();
+    });
+
+    scanButton.addEventListener("click", runScan);
+  </script>
+</body>
+</html>
+
